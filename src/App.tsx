@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowRight,
@@ -34,10 +34,29 @@ function App() {
   const [from, setFrom] = useState("air");
   const [to, setTo] = useState("air");
   const [minimumSteps, setMinimumSteps] = useState(1);
+  const minimumStepsInputRef = useRef<HTMLInputElement>(null);
   const [available, setAvailable] = useState<Set<string>>(() => new Set(data.coreAspects));
   const [query, setQuery] = useState("");
   const [previewAspect, setPreviewAspect] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
+
+  useEffect(() => {
+    const input = minimumStepsInputRef.current;
+    if (!input) return;
+
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault();
+
+      const nextValue = minimumSteps + (event.deltaY < 0 ? 1 : -1);
+      if (nextValue < 1 || nextValue > 99) return;
+
+      setMinimumSteps(nextValue);
+      setResult(null);
+    };
+
+    input.addEventListener("wheel", handleWheel, { passive: false });
+    return () => input.removeEventListener("wheel", handleWheel);
+  }, [minimumSteps]);
 
   const visibleAspects = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -169,9 +188,11 @@ function App() {
               <span className="mb-2 block text-xs font-medium text-[var(--muted-foreground)]">Minimum steps</span>
               <Input
                 id="steps"
+                ref={minimumStepsInputRef}
                 type="number"
                 min={1}
                 max={99}
+                step={1}
                 value={minimumSteps}
                 onChange={(event) => {
                   const value = Math.min(99, Math.max(1, Number(event.target.value) || 1));
