@@ -35,7 +35,7 @@ function App() {
   const [to, setTo] = useState("air");
   const [minimumSteps, setMinimumSteps] = useState(1);
   const minimumStepsInputRef = useRef<HTMLInputElement>(null);
-  const [available, setAvailable] = useState<Set<string>>(() => new Set(data.coreAspects));
+  const [available, setAvailable] = useState<Set<string>>(() => new Set(data.allAspects));
   const [query, setQuery] = useState("");
   const [previewAspect, setPreviewAspect] = useState<string | null>(null);
   const [result, setResult] = useState<Result | null>(null);
@@ -76,7 +76,7 @@ function App() {
   const updateVersion = (nextVersion: string) => {
     const nextData = createResearchData(nextVersion);
     setVersion(nextVersion);
-    setAvailable(new Set(nextData.coreAspects));
+    setAvailable(new Set(nextData.allAspects));
     setFrom(nextData.allAspects.includes("air") ? "air" : nextData.allAspects[0]);
     setTo(nextData.allAspects.includes("air") ? "air" : nextData.allAspects[0]);
     setPreviewAspect(null);
