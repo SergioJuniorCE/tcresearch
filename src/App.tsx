@@ -468,7 +468,7 @@ function App() {
             CC BY 4.0
           </a>
           . Source on{" "}
-          <a className="underline underline-offset-4 hover:text-[var(--foreground)]" href="https://github.com/killerpommes/tcresearch">
+          <a className="underline underline-offset-4 hover:text-[var(--foreground)]" href="https://github.com/SergioJuniorCE/tcresearch">
             GitHub
           </a>
           . Original project by ythri.
