@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDown,
-  ArrowRight,
   ArrowsLeftRight,
   Check,
   MagnifyingGlass,
@@ -23,10 +22,27 @@ import {
   versions,
 } from "./lib/research";
 
-type Result = {
-  path: string[] | null;
-  message?: string;
+type ConnectionRoute = {
+  id: string;
+  from: string;
+  to: string;
+  path: string[];
 };
+
+function getPathItems(path: string[]) {
+  const occurrences = new Map<string, number>();
+  return path.map((aspect, index) => {
+    const occurrence = (occurrences.get(aspect) ?? 0) + 1;
+    occurrences.set(aspect, occurrence);
+    return { aspect, isLast: index === path.length - 1, key: `${aspect}-${occurrence}` };
+  });
+}
+
+function getIntermediateAspectCounts(path: string[]) {
+  const counts = new Map<string, number>();
+  path.slice(1, -1).forEach((aspect) => counts.set(aspect, (counts.get(aspect) ?? 0) + 1));
+  return [...counts.entries()];
+}
 
 function App() {
   const [version, setVersion] = useState(defaultVersion);
@@ -38,7 +54,9 @@ function App() {
   const [available, setAvailable] = useState<Set<string>>(() => new Set(data.allAspects));
   const [query, setQuery] = useState("");
   const [previewAspect, setPreviewAspect] = useState<string | null>(null);
-  const [result, setResult] = useState<Result | null>(null);
+  const [routes, setRoutes] = useState<ConnectionRoute[]>([]);
+  const [searchMessage, setSearchMessage] = useState<string | null>(null);
+  const routeIdRef = useRef(0);
 
   useEffect(() => {
     const input = minimumStepsInputRef.current;
@@ -51,7 +69,7 @@ function App() {
       if (nextValue < 1 || nextValue > 99) return;
 
       setMinimumSteps(nextValue);
-      setResult(null);
+      setSearchMessage(null);
     };
 
     input.addEventListener("wheel", handleWheel, { passive: false });
@@ -67,12 +85,6 @@ function App() {
     );
   }, [data.allAspects, query]);
 
-  const usedAspects = useMemo(() => {
-    const counts = new Map<string, number>();
-    result?.path?.slice(1, -1).forEach((aspect) => counts.set(aspect, (counts.get(aspect) ?? 0) + 1));
-    return [...counts.entries()];
-  }, [result]);
-
   const updateVersion = (nextVersion: string) => {
     const nextData = createResearchData(nextVersion);
     setVersion(nextVersion);
@@ -80,12 +92,13 @@ function App() {
     setFrom(nextData.allAspects.includes("air") ? "air" : nextData.allAspects[0]);
     setTo(nextData.allAspects.includes("air") ? "air" : nextData.allAspects[0]);
     setPreviewAspect(null);
-    setResult(null);
+    setRoutes([]);
+    setSearchMessage(null);
   };
 
   const updateAvailability = (next: Set<string>) => {
     setAvailable(next);
-    setResult(null);
+    setSearchMessage(null);
   };
 
   const toggleAspect = (aspect: string) => {
@@ -106,14 +119,24 @@ function App() {
 
   const runSearch = () => {
     const path = findConnection(from, to, minimumSteps, data.combinations, available);
-    setResult(
-      path
-        ? { path }
-        : {
-            path: null,
-            message: "No connection could be found with this version and step count.",
-          },
-    );
+    if (!path) {
+      setSearchMessage("No connection could be found with this version and step count.");
+      return;
+    }
+
+    const route: ConnectionRoute = {
+      id: `route-${routeIdRef.current++}`,
+      from,
+      to,
+      path,
+    };
+    setRoutes((current) => [...current, route]);
+    setSearchMessage(null);
+  };
+
+  const clearRoutes = () => {
+    setRoutes([]);
+    setSearchMessage(null);
   };
 
   const previewRecipe = previewAspect ? data.combinations[previewAspect] : undefined;
@@ -166,46 +189,46 @@ function App() {
             </label>
 
             <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2 lg:grid-cols-1">
-              <AspectSelect id="from" label="From" value={from} aspects={data.allAspects} onChange={setFrom} />
-              <Button
-                className="mb-1 lg:mx-auto lg:-my-1"
-                variant="ghost"
-                size="icon"
-                aria-label="Swap from and to aspects"
-                title="Swap aspects"
-                onClick={() => {
-                  setFrom(to);
-                  setTo(from);
-                  setResult(null);
-                }}
-              >
-                <ArrowsLeftRight className="lg:rotate-90" size={18} />
-              </Button>
-              <AspectSelect id="to" label="To" value={to} aspects={data.allAspects} onChange={setTo} />
-            </div>
+                  <AspectSelect id="from" label="From" value={from} aspects={data.allAspects} onChange={setFrom} />
+                  <Button
+                    className="mb-1 lg:mx-auto lg:-my-1"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Swap from and to aspects"
+                    title="Swap aspects"
+                    onClick={() => {
+                      setFrom(to);
+                      setTo(from);
+                      setSearchMessage(null);
+                    }}
+                  >
+                    <ArrowsLeftRight className="lg:rotate-90" size={18} />
+                  </Button>
+                  <AspectSelect id="to" label="To" value={to} aspects={data.allAspects} onChange={setTo} />
+                </div>
 
-            <label className="block" htmlFor="steps">
-              <span className="mb-2 block text-xs font-medium text-[var(--muted-foreground)]">Minimum steps</span>
-              <Input
-                id="steps"
-                ref={minimumStepsInputRef}
-                type="number"
-                min={1}
-                max={99}
-                step={1}
-                value={minimumSteps}
-                onChange={(event) => {
-                  const value = Math.min(99, Math.max(1, Number(event.target.value) || 1));
-                  setMinimumSteps(value);
-                  setResult(null);
-                }}
-              />
-            </label>
+                <label className="block" htmlFor="steps">
+                  <span className="mb-2 block text-xs font-medium text-[var(--muted-foreground)]">Minimum steps</span>
+                  <Input
+                    id="steps"
+                    ref={minimumStepsInputRef}
+                    type="number"
+                    min={1}
+                    max={99}
+                    step={1}
+                    value={minimumSteps}
+                    onChange={(event) => {
+                      const value = Math.min(99, Math.max(1, Number(event.target.value) || 1));
+                      setMinimumSteps(value);
+                      setSearchMessage(null);
+                    }}
+                  />
+                </label>
 
-            <Button className="w-full" onClick={runSearch}>
-              <MagicWand size={17} weight="bold" />
-              Find connection
-            </Button>
+                <Button className="w-full" onClick={runSearch}>
+                  <MagicWand size={17} weight="bold" />
+                  Add connection
+                </Button>
           </div>
 
           <div className="my-5 h-px bg-[var(--border)]" />
@@ -246,64 +269,95 @@ function App() {
             <div className="mb-3 flex items-end justify-between gap-4">
               <div>
                 <h2 id="result-heading" className="text-lg font-semibold tracking-tight">
-                  Connection
+                  Connections
                 </h2>
                 <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-                  The shortest route prioritizing your available aspects.
+                  Add each route you need, then follow the vertical columns in-game.
                 </p>
               </div>
-              {result && (
-                <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
-                  <X size={14} />
-                  Clear
-                </Button>
+              {routes.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs tabular-nums text-[var(--muted-foreground)]">
+                    {routes.length} route{routes.length === 1 ? "" : "s"}
+                  </span>
+                  <Button variant="ghost" size="sm" onClick={clearRoutes}>
+                    <X size={14} />
+                    Clear all
+                  </Button>
+                </div>
               )}
             </div>
 
-            {!result && (
+            {routes.length === 0 && !searchMessage && (
               <div className="grid min-h-40 place-items-center rounded-xl border border-dashed border-[var(--border-strong)] px-6 text-center">
                 <div>
                   <MagicWand className="mx-auto mb-3 text-[var(--primary)]" size={24} />
-                  <p className="text-sm font-medium">Ready to trace a path</p>
-                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">Set your aspects, then find a connection.</p>
+                  <p className="text-sm font-medium">Ready to build your route list</p>
+                  <p className="mt-1 text-xs text-[var(--muted-foreground)]">Set a pair of aspects, add the connection, then repeat.</p>
                 </div>
               </div>
             )}
 
-            {result?.message && (
+            {searchMessage && (
               <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-muted)] px-4 py-5 text-sm text-[var(--danger)]">
-                {result.message}
+                {searchMessage}
               </div>
             )}
 
-            {result?.path && (
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 sm:p-5">
-                <div className="flex items-center gap-2 overflow-x-auto pb-3">
-                  {result.path.map((aspect, index) => (
-                    <div className="flex shrink-0 items-center gap-2" key={`${aspect}-${index}`}>
-                      <div className="min-w-32 rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5">
-                        <AspectToken aspect={aspect} active={available.has(aspect)} compact />
+            {routes.length > 0 && (
+              <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+                {routes.map((route, routeIndex) => {
+                  const pathItems = getPathItems(route.path);
+                  const usedAspects = getIntermediateAspectCounts(route.path);
+                  return (
+                    <article key={route.id} className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                      <div className="flex items-start justify-between gap-2 border-b border-[var(--border)] px-3 py-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold">Connection {routeIndex + 1}</p>
+                          <p className="mt-1 truncate text-xs text-[var(--muted-foreground)]">
+                            {aspectName(route.from)} → {aspectName(route.to)}
+                          </p>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="-mr-1 -mt-1 shrink-0"
+                          aria-label={`Remove connection ${routeIndex + 1}`}
+                          title={`Remove connection ${routeIndex + 1}`}
+                          onClick={() => setRoutes((current) => current.filter((item) => item.id !== route.id))}
+                        >
+                          <X size={14} />
+                        </Button>
                       </div>
-                      {index < result.path!.length - 1 && (
-                        <ArrowRight className="text-[var(--muted-foreground)]" size={16} aria-hidden="true" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
-                  <span className="mr-1 text-xs font-medium text-[var(--muted-foreground)]">
-                    {result.path.length - 2} steps
-                  </span>
-                  {usedAspects.map(([aspect, count]) => (
+
+                      <div className="space-y-2 p-3">
+                        {pathItems.map(({ aspect, isLast, key }) => (
+                          <div className="relative" key={key}>
+                            {!isLast && <div className="absolute bottom-0 left-1/2 h-2 w-px translate-y-full bg-[var(--border-strong)]" aria-hidden="true" />}
+                            <div className="rounded-md border border-[var(--border)] bg-[var(--background)] px-3 py-2.5">
+                              <AspectToken aspect={aspect} active={available.has(aspect)} compact />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border)] px-3 py-3">
+                        <span className="mr-1 text-xs font-medium text-[var(--muted-foreground)]">
+                          {route.path.length - 2} step{route.path.length - 2 === 1 ? "" : "s"}
+                        </span>
+                        {usedAspects.map(([aspect, count]) => (
                     <Badge key={aspect} className="gap-1.5">
                       <img className="size-4" src={aspectImage(aspect)} alt="" />
                       {aspectName(aspect)}{count > 1 ? ` ×${count}` : ""}
                     </Badge>
-                  ))}
-                  {result.path.some((aspect) => !available.has(aspect)) && (
-                    <Badge className="border-[var(--warning-border)] text-[var(--warning)]">Uses unavailable aspects</Badge>
-                  )}
-                </div>
+                        ))}
+                        {route.path.some((aspect) => !available.has(aspect)) && (
+                          <Badge className="border-[var(--warning-border)] text-[var(--warning)]">Uses unavailable aspects</Badge>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             )}
           </section>
@@ -395,10 +449,10 @@ function App() {
               <div className="mt-3 max-w-3xl space-y-3 leading-relaxed">
                 <p>
                   Match the From and To fields to the fixed aspects on your research note. Set Minimum steps to the
-                  number of blank spaces between them, then select Find connection.
+                  number of blank spaces between them, then select Add connection. Repeat for every route you need.
                 </p>
                 <p>
-                  If a result uses an aspect you cannot craft, disable it in the library and search again. When no fully
+                  If a route uses an aspect you cannot craft, disable it in the library and add it again. When no fully
                   available route exists, the helper returns the route using the fewest unavailable aspects.
                 </p>
               </div>
