@@ -6,8 +6,10 @@ type AspectTokenProps = {
   active?: boolean;
   compact?: boolean;
   onClick?: () => void;
+  onBlur?: () => void;
   onFocus?: () => void;
   onMouseEnter?: () => void;
+  onMouseLeave?: () => void;
 };
 
 export function AspectToken({
@@ -15,8 +17,10 @@ export function AspectToken({
   active = true,
   compact = false,
   onClick,
+  onBlur,
   onFocus,
   onMouseEnter,
+  onMouseLeave,
 }: AspectTokenProps) {
   const content = (
     <>
@@ -47,8 +51,10 @@ export function AspectToken({
           : "border-transparent bg-[var(--muted)] opacity-50 hover:opacity-70",
       )}
       onClick={onClick}
+      onBlur={onBlur}
       onFocus={onFocus}
       onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
     >
       {content}
     </button>
