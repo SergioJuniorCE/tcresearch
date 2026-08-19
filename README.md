@@ -1,6 +1,6 @@
 # Thaumcraft Research Helper
 
-A lightweight React and TypeScript rebuild of the [Thaumcraft Research Helper](https://killerpommes.github.io/tcresearch/).
+A lightweight React and TypeScript rebuild of the [Thaumcraft Research Helper](https://tcresearch.yoggan.dev/).
 
 Choose the fixed **From** and **To** aspects from a research note, enter the number of blank spaces between them, and select **Find connection**. The pathfinder returns the shortest route while preferring aspects marked as available.
 
